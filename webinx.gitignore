@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.log
+*.zip
+*.tar.gz
+*.sql.gz
+*.png
+Hostinger Backup/
+data/
+logs/
