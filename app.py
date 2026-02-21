@@ -1,36 +1,15 @@
 import os
-from flask import Flask, jsonify
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from flask import Flask
+import psycopg
 
 app = Flask(__name__)
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-def init_db():
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            source TEXT,
-            url TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("Database initialized successfully.")
-    except Exception as e:
-        print("Database initialization failed:", e)
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL is not set")
+    return psycopg.connect(DATABASE_URL)
 
 @app.route("/")
 def home():
@@ -38,36 +17,18 @@ def home():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return {"status": "ok"}
 
-@app.route("/db-test")
-def db_test():
+@app.route("/db-check")
+def db_check():
     try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT 1;")
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        return jsonify({"db_connection": "success", "result": result})
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                result = cur.fetchone()
+        return {"database": "connected", "result": result[0]}
     except Exception as e:
-        return jsonify({"db_connection": "failed", "error": str(e)})
-
-@app.route("/events")
-def list_events():
-    try:
-        conn = get_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM events ORDER BY created_at DESC;")
-        events = cur.fetchall()
-        cur.close()
-        conn.close()
-        return jsonify(events)
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-# Initialize DB when service starts
-init_db()
+        return {"database": "error", "message": str(e)}, 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
