@@ -44,4 +44,6 @@ def db_health():
         return "DB Connected ✅"
     except Exception as e:
         return f"DB Error ❌ {str(e)}"
+        
 if __name__ == "__main__":
+    app.run(debug=True)
