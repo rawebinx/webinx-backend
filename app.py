@@ -29,6 +29,19 @@ def db_check():
         return {"database": "connected", "result": result[0]}
     except Exception as e:
         return {"database": "error", "message": str(e)}, 500
+@app.route("/health/db")
+def db_health():
+    import os
+    import psycopg
 
+    try:
+        conn = psycopg.connect(os.environ["DATABASE_URL"])
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        return "DB Connected ✅"
+    except Exception as e:
+        return f"DB Error ❌ {str(e)}"
 if __name__ == "__main__":
-    app.run(debug=True)
