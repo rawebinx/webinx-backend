@@ -38,14 +38,10 @@ def parse_event_date(event):
         return None
 
     try:
-        # If format is YYYY-MM-DD
         return datetime.strptime(raw_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except:
         try:
-            # If ISO format like 2026-03-05T12:54:55Z
-            return datetime.fromisoformat(
-                raw_date.replace("Z", "+00:00")
-            )
+            return datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
         except:
             return None
 
@@ -64,14 +60,11 @@ def ingest():
     conn = get_connection()
     cursor = conn.cursor()
 
-    inserted = 0
-    updated = 0
+    processed = 0
     skipped = 0
 
     try:
         for event in events:
-
-            print("FULL EVENT:", event)
 
             title = event.get("title")
             event_url = event.get("event_url")
@@ -80,14 +73,12 @@ def ingest():
             start_time = parse_event_date(event)
 
             if not title or not start_time:
-                print("Skipping (missing title or valid date)")
                 skipped += 1
                 continue
 
             source_id = SOURCE_MAP.get(source_name)
 
             if not source_id:
-                print(f"Skipping unknown source: {source_name}")
                 skipped += 1
                 continue
 
@@ -118,11 +109,9 @@ def ingest():
                 ON CONFLICT (slug)
                 DO UPDATE SET
                     title = EXCLUDED.title,
-                    description = EXCLUDED.description,
                     event_url = EXCLUDED.event_url,
                     start_time = EXCLUDED.start_time,
-                    updated_at = EXCLUDED.updated_at
-                RETURNING xmax;
+                    updated_at = EXCLUDED.updated_at;
             """, (
                 str(uuid.uuid4()),
                 title,
@@ -140,18 +129,13 @@ def ingest():
                 now
             ))
 
-            result = cursor.fetchone()
-
-            if result and result[0] == 0:
-                inserted += 1
-            else:
-                updated += 1
+            processed += 1
 
         conn.commit()
 
     except Exception as e:
         conn.rollback()
-        print("❌ Ingestion failed with error:")
+        print("❌ Ingestion failed:")
         print(str(e))
         raise
 
@@ -160,8 +144,7 @@ def ingest():
         conn.close()
 
     print("Ingestion complete")
-    print("Inserted:", inserted)
-    print("Updated:", updated)
+    print("Processed:", processed)
     print("Skipped:", skipped)
 
 
