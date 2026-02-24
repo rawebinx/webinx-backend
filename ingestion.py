@@ -1,7 +1,14 @@
 from db import get_connection
-from intelligence import calculate_rank
 from auto_fetch import fetch
+from intelligence import calculate_rank
 from datetime import datetime
+import uuid
+import re
+
+
+def generate_slug(title):
+    slug = re.sub(r'[^a-zA-Z0-9]+', '-', title.lower()).strip('-')
+    return slug
 
 
 def ingest():
@@ -16,77 +23,79 @@ def ingest():
 
     inserted = 0
     updated = 0
-    skipped = 0
 
     try:
         for event in events:
 
-            # Validation guard
-            required_fields = ["title", "event_date", "country", "mode", "event_url"]
-            if not all(event.get(field) for field in required_fields):
-                skipped += 1
+            if not event.get("title") or not event.get("start_time"):
                 continue
 
-            rank = calculate_rank(event)
+            slug = generate_slug(event["title"])
+            now = datetime.utcnow()
 
-            cursor.execute(
-                "SELECT id FROM events WHERE event_url = ?",
-                (event["event_url"],)
-            )
-            existing = cursor.fetchone()
+            cursor.execute("""
+                INSERT INTO events (
+                    id,
+                    title,
+                    slug,
+                    description,
+                    event_url,
+                    start_time,
+                    end_time,
+                    category_id,
+                    sector_id,
+                    source_id,
+                    host_id,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (slug)
+                DO UPDATE SET
+                    title = EXCLUDED.title,
+                    description = EXCLUDED.description,
+                    event_url = EXCLUDED.event_url,
+                    start_time = EXCLUDED.start_time,
+                    end_time = EXCLUDED.end_time,
+                    updated_at = EXCLUDED.updated_at
+            """, (
+                str(uuid.uuid4()),
+                event["title"],
+                slug,
+                event.get("description"),
+                event.get("event_url"),
+                event["start_time"],
+                event.get("end_time"),
+                event["category_id"],
+                event["sector_id"],
+                event["source_id"],
+                event.get("host_id"),
+                True,
+                now,
+                now
+            ))
 
-            if existing:
-                cursor.execute("""
-                    UPDATE events
-                    SET title = ?,
-                        event_date = ?,
-                        country = ?,
-                        mode = ?,
-                        source = ?,
-                        final_rank = ?,
-                        updated_at = ?
-                    WHERE event_url = ?
-                """, (
-                    event["title"],
-                    event["event_date"],
-                    event["country"],
-                    event["mode"],
-                    event["source"],
-                    rank,
-                    datetime.now(),
-                    event["event_url"]
-                ))
-                updated += 1
-            else:
-                cursor.execute("""
-                    INSERT INTO events
-                    (title, event_date, country, mode, event_url, source, final_rank, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    event["title"],
-                    event["event_date"],
-                    event["country"],
-                    event["mode"],
-                    event["event_url"],
-                    event["source"],
-                    rank,
-                    datetime.now()
-                ))
+            if cursor.rowcount == 1:
                 inserted += 1
+            else:
+                updated += 1
 
         conn.commit()
 
     except Exception as e:
         conn.rollback()
-        print("Critical ingestion failure:", e)
+        print("Ingestion failed:", e)
 
     finally:
         conn.close()
 
-    print(f"Ingestion completed.")
-    print(f"Inserted: {inserted}")
-    print(f"Updated: {updated}")
-    print(f"Skipped: {skipped}")
+    print("Ingestion complete")
+    print("Inserted:", inserted)
+    print("Updated:", updated)
 
 
 if __name__ == "__main__":
