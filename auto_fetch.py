@@ -1,43 +1,243 @@
 import requests
+import json
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
+from urllib.parse import urljoin
 from source_config import SOURCES
 
-KEYWORDS = [
-    "webinar","summit","conference","workshop",
-    "live","session","bootcamp","expo","meetup"
-]
 
-def is_valid(title):
-    if len(title) < 20:
-        return False
-    return any(k in title.lower() for k in KEYWORDS)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+
+# -------------------------------------------------
+# Common Date Extractor (JSON-LD based)
+# -------------------------------------------------
+
+def extract_event_date_from_page(event_url):
+    try:
+        r = requests.get(event_url, headers=HEADERS, timeout=10)
+        if r.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        scripts = soup.find_all("script", type="application/ld+json")
+
+        for script in scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, dict) and data.get("@type") == "Event":
+                    start = data.get("startDate")
+                    if start:
+                        return datetime.fromisoformat(
+                            start.replace("Z", "+00:00")
+                        ).date()
+            except:
+                continue
+
+    except:
+        return None
+
+    return None
+
+
+# -------------------------------------------------
+# EVENTBRITE
+# -------------------------------------------------
+
+def fetch_eventbrite(source):
+    events = []
+    today = datetime.now().date()
+
+    try:
+        response = requests.get(source["url"], headers=HEADERS, timeout=10)
+        if response.status_code != 200:
+            return events
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        links = soup.find_all("a", href=True)
+
+        seen = set()
+        count = 0
+
+        for link in links:
+            href = link["href"]
+
+            if "/e/" not in href:
+                continue
+
+            title = link.get_text(strip=True)
+            if not title or len(title) < 10:
+                continue
+
+            event_url = urljoin(source["url"], href)
+
+            if event_url in seen:
+                continue
+            seen.add(event_url)
+
+            event_date = extract_event_date_from_page(event_url)
+            if not event_date or event_date < today:
+                continue
+
+            events.append({
+                "title": title,
+                "event_date": event_date.strftime("%Y-%m-%d"),
+                "country": "India",
+                "mode": "online",
+                "event_url": event_url,
+                "source": source["name"]
+            })
+
+            count += 1
+            if count >= 20:
+                break
+
+    except:
+        pass
+
+    return events
+
+
+# -------------------------------------------------
+# MEETUP
+# -------------------------------------------------
+
+def fetch_meetup(source):
+    events = []
+    today = datetime.now().date()
+
+    try:
+        response = requests.get(source["url"], headers=HEADERS, timeout=10)
+        if response.status_code != 200:
+            return events
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        links = soup.find_all("a", href=True)
+
+        seen = set()
+        count = 0
+
+        for link in links:
+            href = link["href"]
+
+            if "/events/" not in href:
+                continue
+
+            title = link.get_text(strip=True)
+            if not title or len(title) < 10:
+                continue
+
+            event_url = urljoin(source["url"], href)
+
+            if event_url in seen:
+                continue
+            seen.add(event_url)
+
+            event_date = extract_event_date_from_page(event_url)
+            if not event_date or event_date < today:
+                continue
+
+            events.append({
+                "title": title,
+                "event_date": event_date.strftime("%Y-%m-%d"),
+                "country": "India",
+                "mode": "online",
+                "event_url": event_url,
+                "source": source["name"]
+            })
+
+            count += 1
+            if count >= 20:
+                break
+
+    except:
+        pass
+
+    return events
+
+
+# -------------------------------------------------
+# AIRMEET
+# -------------------------------------------------
+
+def fetch_airmeet(source):
+    events = []
+    today = datetime.now().date()
+
+    try:
+        response = requests.get(source["url"], headers=HEADERS, timeout=10)
+        if response.status_code != 200:
+            return events
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        links = soup.find_all("a", href=True)
+
+        seen = set()
+        count = 0
+
+        for link in links:
+            href = link["href"]
+
+            if "/event/" not in href:
+                continue
+
+            title = link.get_text(strip=True)
+            if not title or len(title) < 8:
+                continue
+
+            event_url = urljoin(source["url"], href)
+
+            if event_url in seen:
+                continue
+            seen.add(event_url)
+
+            event_date = extract_event_date_from_page(event_url)
+            if not event_date or event_date < today:
+                continue
+
+            events.append({
+                "title": title,
+                "event_date": event_date.strftime("%Y-%m-%d"),
+                "country": "India",
+                "mode": "online",
+                "event_url": event_url,
+                "source": source["name"]
+            })
+
+            count += 1
+            if count >= 20:
+                break
+
+    except:
+        pass
+
+    return events
+
+
+# -------------------------------------------------
+# DISPATCHER
+# -------------------------------------------------
 
 def fetch():
-    events = []
-    today = datetime.now()
+    all_events = []
 
     for source in SOURCES:
-        try:
-            r = requests.get(source["url"], timeout=10)
-            soup = BeautifulSoup(r.text,"html.parser")
+        print(f"Fetching from: {source['name']}")
 
-            for i, link in enumerate(soup.find_all("a")):
-                title = link.get_text(strip=True)
-                if not is_valid(title):
-                    continue
+        if source["type"] == "eventbrite":
+            events = fetch_eventbrite(source)
+        elif source["type"] == "meetup":
+            events = fetch_meetup(source)
+        elif source["type"] == "airmeet":
+            events = fetch_airmeet(source)
+        else:
+            events = []
 
-                event_date = (today + timedelta(days=i+3)).strftime("%Y-%m-%d")
+        print(f"Valid events from {source['name']}: {len(events)}")
+        all_events.extend(events)
 
-                events.append({
-                    "title": title,
-                    "event_date": event_date,
-                    "country": "India",
-                    "mode": "online",
-                    "event_url": link.get("href", source["url"]),
-                    "source": source["name"]
-                })
-        except:
-            continue
-
-    return events[:50]
+    print("Total valid events:", len(all_events))
+    return all_events

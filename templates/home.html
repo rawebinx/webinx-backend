@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebinX - Discover Online Events</title>
+
+    <style>
+        body { font-family: Arial; background:#f4f6f9; margin:0; padding:0; }
+
+        header {
+            background:white;
+            padding:25px;
+            text-align:center;
+            box-shadow:0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        h1 { margin:0; }
+
+        .subtitle { color:gray; margin-top:6px; }
+
+        .container {
+            max-width:1000px;
+            margin:30px auto;
+            padding:0 20px;
+        }
+
+        .filters {
+            margin-bottom:20px;
+            text-align:center;
+        }
+
+        input, select {
+            padding:8px;
+            margin:0 5px;
+            border-radius:6px;
+            border:1px solid #ccc;
+        }
+
+        button {
+            padding:8px 14px;
+            border:none;
+            border-radius:6px;
+            background:#007bff;
+            color:white;
+            cursor:pointer;
+        }
+
+        .event-card {
+            background:white;
+            padding:18px;
+            margin-bottom:18px;
+            border-radius:10px;
+            box-shadow:0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        .rank {
+            float:right;
+            background:linear-gradient(90deg,#ff512f,#dd2476);
+            color:white;
+            padding:6px 12px;
+            border-radius:20px;
+            font-size:12px;
+            font-weight:bold;
+        }
+
+        .title { font-size:18px; font-weight:bold; margin-bottom:8px; }
+
+        .meta { font-size:14px; color:gray; }
+
+        .pagination {
+            text-align:center;
+            margin-top:30px;
+        }
+
+        .pagination a {
+            padding:8px 12px;
+            margin:0 4px;
+            background:white;
+            border-radius:6px;
+            text-decoration:none;
+            color:#007bff;
+        }
+
+        .pagination a.active {
+            background:#007bff;
+            color:white;
+        }
+
+        footer {
+            text-align:center;
+            padding:25px;
+            font-size:13px;
+            color:gray;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🔥 WebinX - Trending Online Events</h1>
+    <div class="subtitle">
+        {{ total_events }} curated events
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="filters">
+        <form method="GET">
+            <input type="text" name="search" placeholder="Search events..."
+                   value="{{ search }}">
+
+            <select name="source">
+                <option value="">All Sources</option>
+                <option value="Eventbrite India"
+                    {% if source == "Eventbrite India" %}selected{% endif %}>
+                    Eventbrite
+                </option>
+                <option value="Meetup India"
+                    {% if source == "Meetup India" %}selected{% endif %}>
+                    Meetup
+                </option>
+            </select>
+
+            <button type="submit">Filter</button>
+        </form>
+    </div>
+
+    {% for event in events %}
+    <div class="event-card">
+
+        <div class="rank">
+            Rank: {{ event['final_rank'] }}
+        </div>
+
+        <div class="title">
+            <a href="{{ event['event_url'] }}" target="_blank">
+                {{ event['title'].split("Onlineby")[0] }}
+            </a>
+        </div>
+
+        <div class="meta">
+            📅 {{ event['event_date'] }} |
+            🌐 {{ event['source'] }}
+        </div>
+
+    </div>
+    {% endfor %}
+
+    <div class="pagination">
+        {% for p in range(1, total_pages + 1) %}
+            <a href="?page={{ p }}&search={{ search }}&source={{ source }}"
+               class="{% if p == current_page %}active{% endif %}">
+               {{ p }}
+            </a>
+        {% endfor %}
+    </div>
+
+</div>
+
+<footer>
+    © 2026 WebinX — Discover high-quality online events.
+</footer>
+
+</body>
+</html>

@@ -1,6 +1,17 @@
 SOURCES = [
     {
-        "name": "Startup India",
-        "url": "https://www.startupindia.gov.in/content/sih/en/events.html"
+        "name": "Eventbrite India",
+        "type": "eventbrite",
+        "url": "https://www.eventbrite.com/d/india--online/events/"
+    },
+    {
+        "name": "Meetup India",
+        "type": "meetup",
+        "url": "https://www.meetup.com/find/?location=India&source=EVENTS"
+    },
+    {
+        "name": "Airmeet Events",
+        "type": "airmeet",
+        "url": "https://www.airmeet.com/hub/events"
     }
 ]
